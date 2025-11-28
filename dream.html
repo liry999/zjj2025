@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>梦境记忆回廊</title>
+    <style>
+        /* --- 全局设置与字体 --- */
+        :root {
+            --bg-dark: #050814;
+            --star-light: rgba(255, 255, 255, 0.8);
+            --edge-glow: rgba(200, 200, 255, 0.5);
+            --particle-purple: rgba(180, 160, 255, 0.8);
+            --audio-level: 0; /* 由 JS 动态控制 (0.0 - 1.0) */
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            font-family: "Georgia", "Source Han Serif SC", "Noto Serif SC", serif; /* 文艺衬线字体 */
+            color: var(--star-light);
+        }
+
+        /* --- 视差背景层 --- */
+        .parallax-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 110%; /* 比屏幕稍大以便移动 */
+            height: 110%;
+            pointer-events: none;
+            will-change: transform;
+        }
+
+        /* 后景：微小尖点星图 */
+        #bg-stars-deep {
+            z-index: 1;
+            /* 使用径向渐变模拟微小的非圆形尖点光 */
+            background-image: 
+                radial-gradient(1px 1px at 10% 20%, white 50%, transparent),
+                radial-gradient(1px 1px at 30% 50%, white 50%, transparent),
+                radial-gradient(1px 1px at 70% 30%, white 50%, transparent),
+                radial-gradient(1px 1px at 90% 80%, white 50%, transparent),
+                radial-gradient(2px 2px at 50% 50%, rgba(255,255,255,0.5) 50%, transparent);
+            background-size: 300px 300px;
+            opacity: 0.4;
+        }
+
+        /* 中景：微光雾 */
+        #bg-mist {
+            z-index: 2;
+            background: radial-gradient(circle at center, rgba(100, 120, 255, 0.05) 0%, transparent 60%);
+            opacity: 0.3;
+            animation: breatheMist 10s infinite ease-in-out;
+        }
+
+        /* 前景：亮星点 (带呼吸) */
+        #bg-stars-near {
+            z-index: 3;
+            background-image: 
+                radial-gradient(2px 2px at 15% 25%, white 60%, transparent),
+                radial-gradient(1.5px 1.5px at 60% 60%, white 60%, transparent),
+                radial-gradient(2px 2px at 85% 15%, white 60%, transparent);
+            background-size: 400px 400px;
+            animation: breatheStars 4s infinite ease-in-out alternate;
+        }
+
+        @keyframes breatheMist {
+            0%, 100% { opacity: 0.2; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.05); }
+        }
+        @keyframes breatheStars {
+            0% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* --- 主内容区域 (记忆回廊) --- */
+        #main-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            perspective: 1000px; /* 为 3D 效果做准备 */
+        }
+
+        /* --- 记忆碎片 (主图) --- */
+        .memory-fragment-wrapper {
+            position: relative;
+            width: 500px;
+            height: 500px;
+            /* 核心：基于音量的动态发光滤镜 */
+            filter: drop-shadow(0 0 calc(10px + var(--audio-level) * 30px) var(--edge-glow));
+            transition: filter 0.1s ease-out;
+        }
+
+        .memory-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            /* 核心：应用不规则 SVG 路径作为遮罩 */
+            clip-path: url(#torn-edge-clip);
+            /* 示例图片占位符 */
+            background-image: url('https://picsum.photos/id/102/800/800'); 
+            background-size: cover;
+        }
+
+        /* 粒子画布层，覆盖在图片上 */
+        #particle-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 500px;
+            height: 500px;
+            pointer-events: none;
+            z-index: 2; /* 在图片之上 */
+        }
+
+        /* --- AI 对话与交互 --- */
+        #ai-response-area {
+            min-height: 60px;
+            margin-top: 30px;
+            text-align: center;
+            font-style: italic;
+            font-weight: 300;
+            letter-spacing: 1px;
+            opacity: 0.9;
+            max-width: 600px;
+        }
+
+        .floating-text-enter {
+            animation: floatIn 0.8s ease-out forwards;
+        }
+
+        @keyframes floatIn {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- UI 按钮 --- */
+        /* 麦克风按钮容器 */
+        .mic-container {
+            position: relative;
+            margin-top: 40px;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        /* 外圈圆环 */
+        .mic-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        /* 录音时的呼吸与脉冲效果 */
+        .mic-container.recording .mic-ring {
+            border-color: rgba(255, 255, 255, 0.9);
+            animation: micPulse 1.5s infinite;
+            box-shadow: 0 0 15px var(--edge-glow) inset, 0 0 15px var(--edge-glow);
+        }
+
+        @keyframes micPulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.15); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.8; }
+        }
+
+        /* 简笔画麦克风图标 */
+        .mic-icon {
+            width: 24px;
+            height: 34px;
+            border: 1px solid white;
+            border-radius: 12px;
+            position: relative;
+            background: transparent;
+        }
+        .mic-icon::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            width: 1px;
+            height: 8px;
+            background: white;
+            transform: translateX(-50%);
+        }
+        .mic-icon::before {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            width: 16px;
+            height: 1px;
+            background: white;
+            transform: translateX(-50%);
+        }
+
+        /* Save Memory 按钮 */
+        #save-memory-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 40px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-family: inherit;
+            font-size: 14px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            padding: 5px 10px;
+            transition: all 0.4s ease;
+            z-index: 100;
+        }
+
+        #save-memory-btn:hover {
+            color: white;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        }
+
+        /* --- 日志模态框 (模拟) --- */
+        #log-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 8, 20, 0.95);
+            z-index: 200;
+            display: none; /* 默认隐藏 */
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            box-sizing: border-box;
+        }
+        
+        #log-content {
+            background: transparent;
+            color: #e0e0e0;
+            max-width: 700px;
+            line-height: 1.8;
+            font-size: 16px;
+            white-space: pre-wrap; /* 保留换行 */
+            border-left: 1px solid rgba(255,255,255,0.3);
+            padding-left: 30px;
+        }
+        #close-log {
+            position: absolute; top: 20px; right: 30px; cursor: pointer; font-size: 24px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <svg width="0" height="0">
+        <defs>
+            <clipPath id="torn-edge-clip" clipPathUnits="objectBoundingBox">
+                <path d="M 0.5 0.05 C 0.6 0.02, 0.7 0.08, 0.8 0.04 C 0.88 0.01, 0.95 0.1, 0.98 0.2 C 1.0 0.3, 0.92 0.4, 0.96 0.5 C 1.0 0.6, 0.9 0.75, 0.95 0.85 C 0.98 0.95, 0.85 0.98, 0.75 0.96 C 0.65 0.94, 0.55 1.0, 0.45 0.98 C 0.35 0.96, 0.25 0.92, 0.15 0.95 C 0.05 0.98, 0.02 0.85, 0.04 0.75 C 0.06 0.65, 0.0 0.55, 0.03 0.45 C 0.06 0.35, 0.1 0.2, 0.05 0.1 C 0.02 0.02, 0.15 0.05, 0.25 0.03 C 0.35 0.01, 0.4 0.08, 0.5 0.05 Z" />
+            </clipPath>
+        </defs>
+    </svg>
+
+    <div class="parallax-layer" id="bg-stars-deep" data-speed="0.02"></div>
+    <div class="parallax-layer" id="bg-mist" data-speed="0.05"></div>
+    <div class="parallax-layer" id="bg-stars-near" data-speed="0.1"></div>
+
+    <div id="main-container">
+        <div class="memory-fragment-wrapper" id="fragment-wrapper">
+            <canvas id="particle-canvas" width="500" height="500"></canvas>
+            <div class="memory-image"></div>
+        </div>
+
+        <div id="ai-response-area">
+            </div>
+
+        <div class="mic-container" id="mic-toggle">
+            <div class="mic-ring"></div>
+            <div class="mic-icon"></div>
+        </div>
+    </div>
+
+    <button id="save-memory-btn">Save Memory</button>
+
+    <div id="log-modal">
+        <div id="close-log">×</div>
+        <div id="log-content"></div>
+    </div>
+
+
+    <script>
+        // ==========================================
+        // 1. 视差背景效果 (Parallax)
+        // ==========================================
+        const layers = document.querySelectorAll('.parallax-layer');
+        
+        document.addEventListener('mousemove', (e) => {
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
+            const winWidth = window.innerWidth;
+            const winHeight = window.innerHeight;
+
+            // 计算鼠标相对于中心的位置 (-0.5 到 0.5)
+            const offsetX = (mouseX - winWidth / 2) / winWidth;
+            const offsetY = (mouseY - winHeight / 2) / winHeight;
+
+            layers.forEach(layer => {
+                const speed = parseFloat(layer.getAttribute('data-speed'));
+                // 根据速度反向移动层
+                const x = offsetX * speed * -100;
+                const y = offsetY * speed * -100;
+                layer.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+            });
+        });
+
+        // ==========================================
+        // 2. 音频处理 (Web Audio API)
+        // ==========================================
+        let audioContext, analyser, microphone, dataArray;
+        let isRecording = false;
+        let currentVolume = 0; // 全局变量，供粒子系统使用
+
+        async function toggleMicrophone() {
+            if (isRecording) {
+                stopListening();
+            } else {
+                await startListening();
+            }
+        }
+
+        async function startListening() {
+            try {
+                // 获取麦克风权限
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+
+                // 设置分析器
+                analyser.fftSize = 256;
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+
+                isRecording = true;
+                document.getElementById('mic-toggle').classList.add('recording');
+                document.getElementById('ai-response-area').innerHTML = "<span style='opacity:0.6'>正在倾听你的梦境碎片...</span>";
+
+                analyzeAudio(); // 开始分析循环
+
+            } catch (err) {
+                console.error("麦克风访问失败:", err);
+                alert("无法访问麦克风，请确保已授予权限且通过 HTTPS/localhost 访问。");
+            }
+        }
+
+        function stopListening() {
+            if (audioContext && audioContext.state !== 'closed') {
+                audioContext.close();
+            }
+            isRecording = false;
+            currentVolume = 0; // 重置音量
+            updateAudioCssVariables(0); // 重置视觉效果
+            document.getElementById('mic-toggle').classList.remove('recording');
+            
+            // 触发 AI 回应模拟
+            simulateAIResponse();
+        }
+
+        function analyzeAudio() {
+            if (!isRecording) return;
+            requestAnimationFrame(analyzeAudio);
+
+            analyser.getByteFrequencyData(dataArray);
+
+            // 计算平均音量 (RMS 可能会更好，但平均值对于视觉效果足够了)
+            let sum = 0;
+            for(let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            let average = sum / dataArray.length;
+
+            // 将音量标准化到 0.0 - 1.0 之间 (阈值可以根据需要调整，这里设 150 为最大声)
+            currentVolume = Math.min(average / 150, 1.0);
+            
+            // 如果音量很小，强制归零，避免背景噪音导致闪烁
+            if (currentVolume < 0.05) currentVolume = 0;
+
+            updateAudioCssVariables(currentVolume);
+        }
+
+        // 更新 CSS 变量以驱动发光和呼吸
+        function updateAudioCssVariables(volume) {
+             // 设置 CSS 变量，让 CSS filter 读取
+            document.documentElement.style.setProperty('--audio-level', volume.toFixed(2));
+        }
+
+
+        // ==========================================
+        // 3. 边缘粒子系统 (Canvas API)
+        // ==========================================
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        const cw = canvas.width;
+        const ch = canvas.height;
+        let particles = [];
+
+        // 定义一个简化的近似路径用于粒子发射，模拟 SVG 的形状
+        // 这是一个简化的椭圆+噪声方法，为了演示效果。精确匹配 SVG 需要更复杂的数学计算。
+        function getSpawnPointOnEdge() {
+            const angle = Math.random() * Math.PI * 2;
+            // 基础半径 (略小于画布一半)
+            let baseRadiusX = cw * 0.42; 
+            let baseRadiusY = ch * 0.45;
+            
+            // 添加一些基于角度的噪点，模拟不规则形状
+            let noise = Math.sin(angle * 5) * 20 + Math.cos(angle * 3) * 15;
+            
+            // 计算边界上的点
+            const startX = cw / 2 + (baseRadiusX + noise) * Math.cos(angle);
+            const startY = ch / 2 + (baseRadiusY + noise) * Math.sin(angle);
+            
+            // 计算向外的向量
+            const dirX = Math.cos(angle);
+            const dirY = Math.sin(angle);
+
+            return { x: startX, y: startY, dx: dirX, dy: dirY };
+        }
+
+
+        class Particle {
+            constructor() {
+                const spawn = getSpawnPointOnEdge();
+                this.x = spawn.x;
+                this.y = spawn.y;
+                this.size = Math.random() * 1.5 + 0.5; // 微小粒子
+                
+                // 基础速度 + 音量加成
+                // 音量越大，速度越快，扩散越远
+                const speedBase = Math.random() * 0.5 + 0.2;
+                const speedAudioFactor = currentVolume * 5; // 音量对速度的影响系数
+                this.speed = speedBase + speedAudioFactor;
+
+                this.vx = spawn.dx * this.speed;
+                this.vy = spawn.dy * this.speed;
+
+                this.life = 1.0; // 生命值 1.0 -> 0.0
+                // 音量越大，生命衰减越慢（飞得越远）
+                this.decay = Math.random() * 0.01 + 0.005 - (currentVolume * 0.005);
+
+                // 颜色：白色带一点点紫
+                this.isPurple = Math.random() > 0.8;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+
+                // 缓慢变小
+                if (this.life > 0) {
+                    this.size -= 0.01;
+                }
+            }
+
+            draw() {
+                if (this.life <= 0 || this.size <=0) return;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                // 根据生命值设置透明度
+                const alpha = this.life * (this.isPurple ? 0.6 : 0.8);
+                ctx.fillStyle = this.isPurple 
+                    ? `rgba(180, 160, 255, ${alpha})` 
+                    : `rgba(255, 255, 255, ${alpha})`;
+                ctx.fill();
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, cw, ch);
+
+            // 根据音量决定发射多少新粒子
+            // 音量越大，发射越多
+            let spawnCount = isRecording ? Math.floor(currentVolume * 10) + 1 : 1;
+            // 即使不说话，也保持最低限度的粒子逸散，保持梦境感
+            if (!isRecording && Math.random() > 0.8) spawnCount = 1; 
+
+            for (let i = 0; i < spawnCount; i++) {
+                particles.push(new Particle());
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].life <= 0 || particles[i].size <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles(); // 启动粒子循环
+
+
+        // ==========================================
+        // 4. AI 交互与日志生成模拟 (Interaction Mockup)
+        // ==========================================
+        
+        const micToggleBtn = document.getElementById('mic-toggle');
+        const aiResponseArea = document.getElementById('ai-response-area');
+        const saveBtn = document.getElementById('save-memory-btn');
+        const logModal = document.getElementById('log-modal');
+        const logContent = document.getElementById('log-content');
+        const closeLogBtn = document.getElementById('close-log');
+
+        // 模拟的对话记录
+        let conversationHistory = [];
+        const mockResponses = [
+            "我听到了，那片海是不是像今晚的夜色一样深沉？",
+            "这确实是一种难以言喻的失落感，像星星从画布上剥离。",
+            "那个瞬间被你保存得很完整，它现在安全了。",
+            "也许梦境是在试图告诉你，有些裂痕本身就是光照进来的地方。"
+        ];
+        let responseIndex = 0;
+
+        micToggleBtn.addEventListener('click', toggleMicrophone);
+
+        function simulateAIResponse() {
+            // 模拟思考延迟
+            aiResponseArea.innerHTML = "<span style='opacity:0.6'>...</span>";
+            setTimeout(() => {
+                // 获取下一个模拟回复
+                const response = mockResponses[responseIndex % mockResponses.length];
+                responseIndex++;
+                
+                // 显示回复，添加浮现动画类
+                aiResponseArea.innerHTML = `<div class="floating-text-enter">${response}</div>`;
+                
+                // 记录对话 (模拟)
+                conversationHistory.push({ role: 'user', content: '(用户语音输入的声音碎片)' });
+                conversationHistory.push({ role: 'ai', content: response });
+
+            }, 800);
+        }
+
+        // 点击保存按钮生成日志
+        saveBtn.addEventListener('click', () => {
+            if (conversationHistory.length === 0) {
+                alert("还没有对话记录，请先点击麦克风与我交谈。");
+                return;
+            }
+            generateLiteraryLog();
+        });
+
+        function generateLiteraryLog() {
+            // 模拟将对话加工成文学日志
+            const date = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+            let literaryText = `【梦境档案 - ${date}】\n\n`;
+            literaryText += "夜色已深，旅行者带来了新的记忆碎片。回廊里的微光随着叙述而颤动。\n\n";
+            
+            // 简单地将对话串联起来，实际应用中这里需要 AI 进行润色
+            conversationHistory.forEach(entry => {
+                if (entry.role === 'ai') {
+                    literaryText += `回响：${entry.content}\n\n`;
+                } else {
+                     literaryText += `低语：......\n`; // 用省略号代替用户的原始语音
+                }
+            });
+            
+            literaryText += "\n这些情绪被小心地收集，如同标本夹在时间的缝隙里。裂痕依然存在，但此刻，它是温柔的。";
+
+            logContent.innerText = literaryText;
+            logModal.style.display = 'flex';
+        }
+
+        closeLogBtn.addEventListener('click', () => {
+            logModal.style.display = 'none';
+        });
+
+        // 模拟鼠标移动切换图片的交互提示（实际项目中需要更复杂的逻辑）
+        document.addEventListener('mousemove', (e) => {
+             const wrapper = document.getElementById('fragment-wrapper');
+             // 简单的视差移动
+             const moveX = (e.clientX - window.innerWidth/2) * 0.02;
+             const moveY = (e.clientY - window.innerHeight/2) * 0.02;
+             wrapper.style.transform = `translate3d(${moveX}px, ${moveY}px, 0) rotateZ(${moveX*0.1}deg)`;
+        });
+
+    </script>
+</body>
+</html>
