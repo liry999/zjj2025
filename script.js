@@ -44,7 +44,7 @@ drawParticles();
 /* ===================================
    🌀 2. 记忆碎片左右切换
 =================================== */
-const images = ["images/p1.jpg","images/p2.jpg","images/p3.jpg"];
+const images = ["image/p1.jpg","image/p2.jpg","image/p3.jpg"];
 let current = 0;
 
 const centerImg = document.getElementById("memory-img");
