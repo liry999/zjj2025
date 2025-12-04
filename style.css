@@ -112,8 +112,8 @@ body {
 
 
 #diaryText {
-    width: 60%;
-    height: 230px;               /* ⬅ 拉长 */
+    width: 100%;
+    height: 100px;               /* ⬅ 拉长 */
     background: rgba(0,0,0,0.35);
     border: 1px solid #777;      /* ⬅ 让边框更轻一点 */
     border-radius: 10px;
