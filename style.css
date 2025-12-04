@@ -53,7 +53,7 @@ body {
 /* 🎤 麦克风按钮 */
 #mic-button {
     position: absolute;
-    bottom: -30px; left: 50%;
+    bottom: -60px; left: 50%;
     transform: translateX(-50%);
     font-size: 22px;
     padding: 12px;
@@ -112,7 +112,7 @@ body {
 
 
 #diaryText {
-    width: 100%;
+    width: 60%;
     height: 230px;               /* ⬅ 拉长 */
     background: rgba(0,0,0,0.35);
     border: 1px solid #777;      /* ⬅ 让边框更轻一点 */
