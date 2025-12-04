@@ -138,3 +138,51 @@ button {
 button:hover {
     background: #666;
 }
+/* 🔒 黑屏密码层 */
+#lock-screen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999; /* 永远在最上层 */
+    color: white;
+    font-family: "Microsoft YaHei";
+}
+
+#lock-box {
+    text-align: center;
+}
+
+#lock-box input {
+    width: 230px;
+    padding: 10px;
+    margin-top: 15px;
+    border-radius: 6px;
+    border: none;
+    font-size: 16px;
+}
+
+#secret-btn {
+    margin-top: 15px;
+    padding: 8px 16px;
+    background: #444;
+    color: white;
+    border: 1px solid #777;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+#secret-btn:hover {
+    background: #666;
+}
+
+#secret-hint {
+    margin-top: 12px;
+    color: #ff6b6b;
+    font-size: 14px;
+}
+
