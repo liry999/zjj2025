@@ -140,7 +140,7 @@ if ('webkitSpeechRecognition' in window) {
 
     recognition.onresult = e => {
         const text = e.results[0][0].transcript;
-        diaryText.value = `你说：${text}`;
+        diaryText.value = `张艾嘉说：${text}`;
     };
 
     recognition.onend = () => {
@@ -148,7 +148,7 @@ if ('webkitSpeechRecognition' in window) {
 
         // 停止后随机回击一句“夸夸语”
         const randomReply = replies[Math.floor(Math.random() * replies.length)];
-        diaryText.value += `\n\n系统自动回复：${randomReply}`;
+        diaryText.value += `\n\n李若怡自动回复：${randomReply}`;
     };
 }
 
