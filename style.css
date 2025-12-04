@@ -53,7 +53,7 @@ body {
 /* 🎤 麦克风按钮 */
 #mic-button {
     position: absolute;
-    bottom: -18px; left: 50%;
+    bottom: -30px; left: 50%;
     transform: translateX(-50%);
     font-size: 22px;
     padding: 12px;
