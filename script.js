@@ -171,3 +171,28 @@ micBtn.onclick = () => {
         recognition.stop();
     }
 };
+/* ===================================
+   🔒 5. 密码开锁系统
+=================================== */
+const lockScreen = document.getElementById("lock-screen");
+const secretInput = document.getElementById("secret-input");
+const secretBtn = document.getElementById("secret-btn");
+const secretHint = document.getElementById("secret-hint");
+
+secretBtn.onclick = () => {
+    const text = secretInput.value.trim();
+
+    if (text === "李若怡真厉害") {
+        // ✔ 正确 → 淡出黑屏
+        lockScreen.style.transition = "opacity 1.2s";
+        lockScreen.style.opacity = "0";
+
+        setTimeout(() => {
+            lockScreen.style.display = "none";
+        }, 1200);
+
+    } else {
+        // ❌ 错误 → 提示
+        secretHint.textContent = "指令错误，详情请咨询李若怡";
+    }
+};
